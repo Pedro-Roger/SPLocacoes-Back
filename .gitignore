@@ -1,0 +1,21 @@
+# Dependências
+node_modules/
+
+# Builds
+dist/
+build/
+
+# Ambiente
+.env
+.env.local
+.env*.local
+
+# Uploads locais (desenvolvimento)
+uploads/
+
+# Logs
+npm-debug.log*
+yarn-error.log*
+
+# Sistema
+.DS_Store
