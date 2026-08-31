@@ -10,13 +10,20 @@ const router = Router();
 // GET /api/equipamentos — catálogo público com filtros, busca e paginação
 router.get('/equipamentos', async (req, res, next) => {
   try {
-    const { categoria, eixos, disponibilidade, busca } = req.query;
+    const { categoria, eixos, ano, disponibilidade, busca, modalidade } = req.query;
     const { pagina, limite } = parsePagination(req.query, { defaultLimite: 12 });
 
     const filter = { status: 'publicado' };
     if (categoria) filter.category = categoria;
     if (eixos) filter.axles = Number(eixos);
+    if (ano) filter.year = Number(ano);
     if (disponibilidade) filter.availability = disponibilidade;
+    // rental → rental + both; sale → sale + both; sem modalidade → todos
+    if (modalidade) {
+      filter.commercialType = modalidade === 'both'
+        ? 'both'
+        : { $in: [modalidade, 'both'] };
+    }
     if (busca) filter.$text = { $search: busca };
 
     const [items, total] = await Promise.all([
