@@ -1,0 +1,27 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: locacao-semirreboques-mongo
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+
+  backend:
+    build: .
+    image: locacao-semirreboques-backend
+    container_name: locacao-semirreboques-backend
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    env_file:
+      - .env
+    environment:
+      TZ: ${TZ:-America/Sao_Paulo}
+    volumes:
+      - uploads:/app/uploads
+    ports:
+      - "4000:4000"
+
+volumes:
+  uploads:
+  mongo-data:
