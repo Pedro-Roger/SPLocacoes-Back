@@ -17,6 +17,32 @@ const upload = multer({
 
 // ---------- Upload de imagens ----------
 
+// Hosts que viven apenas na máquina de desenvolvimento (localhost / loopback /
+// rangos privados) → podem usar http. Qualquer host público exige https para
+// evitar Mixed Content no navegador (el admin se sirve por https).
+function isLocalHost(host) {
+  const h = String(host || '').toLowerCase().trim();
+  return (
+    h.startsWith('localhost') ||   // localhost, localhost:3000
+    h.startsWith('127.') ||        // 127.x.x.x[:puerto]
+    h.startsWith('0.0.0.0') ||
+    h.startsWith('::1') ||         // IPv6 loopback [::1]:puerto
+    h.startsWith('10.') ||         // RFC1918 10/8
+    h.startsWith('192.168.') ||    // RFC1918 192.168/16
+    /^172\.(1[6-9]|2\d|3[01])\./.test(h) // RFC1918 172.16/12
+  );
+}
+
+// Deriva el protocolo correcto para construir la URL local de la imagen.
+// Detrás de un proxy (Railway/nginx) req.protocol es siempre http aunque la
+// petición original llegue por https, así que no puede fiarse de él: se usa
+// el header X-Forwarded-Proto cuando es https y, para cualquier host público,
+// se fuerza https (nunca http). Solo los hosts locales devuelven http.
+function resolveLocalProtocol(req, host) {
+  if (req.headers['x-forwarded-proto'] === 'https') return 'https';
+  return isLocalHost(host) ? 'http' : 'https';
+}
+
 // POST /api/painel/upload — otimização automática (máx. 1600px, WebP) e
 // envio para S3 quando configurado; disco local em desenvolvimento
 router.post('/upload', upload.single('file'), async (req, res, next) => {
@@ -27,8 +53,9 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
 
     const buffer = await processImage(req.file.buffer);
 
+    const host = req.get('host');
     const url = await saveImage(buffer, name, {
-      localBaseUrl: `${req.protocol}://${req.get('host')}`,
+      localBaseUrl: `${resolveLocalProtocol(req, host)}://${host}`,
     });
     res.status(201).json({ url });
   } catch (err) {

@@ -54,4 +54,55 @@ describe('POST /api/painel/upload', () => {
 
     expect(fs.existsSync(filePath)).toBe(true);
   });
+
+  test('gera URL https para host externo mesmo quando protocolo interno é http ( Mixed Content fix )', async () => {
+    const origBucket = process.env.S3_BUCKET;
+    const origPublicUrl = process.env.S3_PUBLIC_URL;
+    delete process.env.S3_BUCKET;
+    delete process.env.S3_PUBLIC_URL;
+
+    const { agent } = await loginAsAdmin();
+
+    const res = await agent
+      .post('/api/painel/upload')
+      .set('Host', 'sp-api.linkdecadastro.com.br')
+      .attach('file', TINY_PNG, 'foto-mixed.png');
+
+    // Deve sempre gerar https para host público, nunca http
+    expect(res.status).toBe(201);
+    expect(res.body.url).toMatch(/^https:\/\/sp-api\.linkdecadastro\.com\.br\/uploads\/.+\.webp$/);
+    expect(res.body.url).not.toMatch(/^http:\/\//);
+
+    const filename = res.body.url.split('/uploads/')[1];
+    const filePath = path.join(UPLOADS_DIR, filename);
+    createdFiles.push(filePath);
+
+    if (origBucket !== undefined) process.env.S3_BUCKET = origBucket;
+    if (origPublicUrl !== undefined) process.env.S3_PUBLIC_URL = origPublicUrl;
+  });
+
+  test('respeita x-forwarded-proto https mesmo com req.protocol http', async () => {
+    const origBucket = process.env.S3_BUCKET;
+    const origPublicUrl = process.env.S3_PUBLIC_URL;
+    delete process.env.S3_BUCKET;
+    delete process.env.S3_PUBLIC_URL;
+
+    const { agent } = await loginAsAdmin();
+
+    const res = await agent
+      .post('/api/painel/upload')
+      .set('Host', 'sp-api.linkdecadastro.com.br')
+      .set('X-Forwarded-Proto', 'https')
+      .attach('file', TINY_PNG, 'foto-forwarded.png');
+
+    expect(res.status).toBe(201);
+    expect(res.body.url).toMatch(/^https:\/\//);
+
+    const filename = res.body.url.split('/uploads/')[1];
+    const filePath = path.join(UPLOADS_DIR, filename);
+    createdFiles.push(filePath);
+
+    if (origBucket !== undefined) process.env.S3_BUCKET = origBucket;
+    if (origPublicUrl !== undefined) process.env.S3_PUBLIC_URL = origPublicUrl;
+  });
 });
